@@ -358,7 +358,7 @@ test <- data.frame(
 )
 
 chisq.test(test, simulate.p.value = T)
-fisher.test(test, simulate.p.value = T)
+fisher.test(test, simulate.p.value = T, alternative = 'two.sided')
 
 
 # Suppl. Figure - Swimmers plot -------------------------------------------

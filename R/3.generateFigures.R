@@ -11,7 +11,7 @@ library(ggplot2)
 library(patchwork)
 
 # Helper theme.
-theme_Job <- theme(
+theme_Job <- ggplot2::theme(
     legend.position = 'bottom',
     legend.direction = 'horizontal',
     text = ggplot2::element_text(size=9, family='Helvetica', face = 'bold'),
@@ -117,9 +117,11 @@ plots <- list()
 # Do statistical tests.
 stat.test <- overviewPatients %>%
     dplyr::mutate(g = `AR-V7 (Baseline) with n`, value = `CTC Count (Baseline)`) %>%
-    rstatix::wilcox_test(value ~ g, exact = T, p.adjust.method = 'none', detailed = T, paired = F) %>%
+    rstatix::pairwise_wilcox_test(value ~ g, exact = T, p.adjust.method = 'none', detailed = T, paired = F) %>%
     rstatix::adjust_pvalue(method = 'BH') %>%
     rstatix::add_significance(cutpoints = c(0, 0.001, 0.01, 0.05, 1), symbols = c('***', '**', '*', 'ns'))
+
+
 
 plots$ARv7vsCTC <- overviewPatients %>%
     dplyr::group_by(`AR-V7 (Baseline) with n`) %>%
@@ -146,15 +148,14 @@ plots$ZScorevsCTCCorr <- overviewPatients %>%
     ) %>%
     dplyr::filter(`Genome-Wide Z Score (Baseline)` != '.') %>%
     dplyr::mutate(`Genome-Wide Z Score (Baseline)` = as.numeric(`Genome-Wide Z Score (Baseline)`)) %>%
-    ggplot2::ggplot(., aes(x = `Genome-Wide Z Score (Baseline)`, y = `CTC Count (Baseline)`, fill = groupStatus, group = '1')) +
-    ggpmisc::stat_poly_eq(formula = y ~ x, aes(color = NULL, label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "~~~")), parse = TRUE) +
-    ggplot2::geom_point(shape = 21) +
+    ggplot2::ggplot(., aes(x = `Genome-Wide Z Score (Baseline)`, y = `CTC Count (Baseline – 7.5mL)`, fill = groupStatus, group = '1')) +
+    ggpmisc::stat_fit_glance(method = "cor.test",label.y = "top", method.args = list(formula = ~ x + y, method = "spearman", exact = FALSE), mapping = aes(label = sprintf('rho~"="~%.3f~~italic(P)~"="~%.2g',stat(estimate), stat(p.value))),parse = TRUE) +     ggplot2::geom_point(shape = 21) +
     ggplot2::geom_vline(aes(xintercept = 5), lty = '11', color = '#D00103') +
     ggplot2::scale_fill_manual(values = c('AR-V7<sup>Pos.</sup>' = '#FE6100', 'AR-V7<sup>Neg.</sup>' = '#648FFF', 'AR-V7<sup>Und.</sup>' = '#4D4D4D', 'AR-V7<sup>Conv.</sup>' = '#00A94D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     ggplot2::scale_x_continuous(trans = scales::pseudo_log_trans(), breaks = c(0, 5, 10, 25, 50, 100, 250, 500, 750), limits = c(-.5, 800), expand = c(0,0)) +
     ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), breaks = c(0, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000), limits = c(-.5, 6000), expand = c(0,0)) +
     ggplot2::geom_smooth(color = 'red', method = 'lm') +
-    ggplot2::labs(y = 'CTC Count (Baseline)', x = 'Aneuploidy score (Baseline)<br>(i.e. Genome-wide Z-Score)') +
+    ggplot2::labs(y = 'CTC Count (Baseline – 7.5mL)', x = 'Aneuploidy score (Baseline)<br>(i.e. Genome-wide Z-Score)') +
     theme_Job
 
 

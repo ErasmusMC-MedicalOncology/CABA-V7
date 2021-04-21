@@ -75,7 +75,7 @@ plotSurvival <- function(fit, ylim, hr = NULL){
 
         HR.CI <- round(summary(hr)$conf.int, 2)
         HR.p <- round(summary(hr)$waldtest[[3]], 2)
-        HR.CI <- sprintf('HR (.95 CI): %s (%s - %s)', HR.CI[[1]], HR.CI[[3]], HR.CI[[4]])
+        HR.CI <- sprintf('HR (95% CI): %s (%s - %s)', HR.CI[[1]], HR.CI[[3]], HR.CI[[4]])
         x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = .9, label = HR.CI, size = 2.5)
     }
 
