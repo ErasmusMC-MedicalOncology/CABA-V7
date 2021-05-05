@@ -1,5 +1,5 @@
 # Author:                      Job van Riet
-# Date:                        03-03-2021
+# Date:                        05-05-2021
 # Function:                    Generate Survival Curves for the CABA-V7 study.
 
 
@@ -19,7 +19,7 @@ library(patchwork)
 source('R/misc_themes.R')
 
 # Generate survival plots with p-values and median OS.
-plotSurvival <- function(fit, ylim, hr = NULL){
+plotSurvival <- function(fit, ylim, data, hr = NULL){
 
     # Generate survival plot.
     x <- survminer::ggsurvplot(
@@ -53,7 +53,7 @@ plotSurvival <- function(fit, ylim, hr = NULL){
     )
 
     # Add the log-rank p-value.
-    p.logrank <- survminer::surv_pvalue(fit = fit, method = 'log-rank', data = data.Survival, test.for.trend = F)
+    p.logrank <- survminer::surv_pvalue(fit = fit, method = 'log-rank', data = data, test.for.trend = F)
     x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = 1, label = paste0('log-rank: ', p.logrank$pval.txt), size = 2.5)
 
     # Add HR (if two groups)
@@ -61,7 +61,7 @@ plotSurvival <- function(fit, ylim, hr = NULL){
 
         HR.CI <- round(summary(hr)$conf.int, 2)
         HR.p <- round(summary(hr)$waldtest[[3]], 2)
-        HR.CI <- sprintf('HR (95% CI): %s (%s - %s)', HR.CI[[1]], HR.CI[[3]], HR.CI[[4]])
+        HR.CI <- sprintf('HR (.95%% CI): %s (%s - %s)', HR.CI[[1]], HR.CI[[3]], HR.CI[[4]])
         x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = .9, label = HR.CI, size = 2.5)
     }
 
@@ -115,37 +115,40 @@ plotFits <- list()
 
 #  Survival - All inclusion ------------------------------------------------
 
-fit.AllInClusion <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline. + Inclusion..Treated.with.Caba., data = data.Survival)
-names(fit.AllInClusion$strata) <-  c('AR-V7 Neg.', 'AR-V7 Pos. (Not treated with caba. as part of CABA-V7 trial)', 'AR-V7 Pos. (Treated with caba. as part of -V7 trial)', 'AR-V7 Und.')
+fit.AllInClusion <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.Survival)
+names(fit.AllInClusion$strata) <-  c('AR-V7 Neg.', 'AR-V7 Pos.', 'AR-V7 Und.')
 
-plotFits$AllInclusion <- plotSurvival(fit.AllInClusion, ylim = 51)
+plotFits$AllInclusion <- plotSurvival(fit.AllInClusion, data = data.Survival, ylim = 51)
 
 # Hazard Ratio of multiple groups.
 fit.AllInClusion.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.Survival)
-plotFits$hazardAll <- survminer::ggforest(fit.AllInClusion.hr,  data = data.Survival, noDigits = 2)
+plotFits$hazardAll <- survminer::ggforest(fit.AllInClusion.hr, data = data.Survival, noDigits = 2)
 
 
 # Survival - Caba-V7 (Pos.) vs. Neg. / Und. -------------------------------
 
-fit.PosVsNeg <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.Survival %>% dplyr::mutate(AR.V7..Baseline. = ifelse(AR.V7..Baseline. %in% c('Neg.', 'Und.'), 'Neg. / Und.', 'Pos.')))
+data.PosVsNeg <- data.Survival %>% dplyr::mutate(AR.V7..Baseline. = ifelse(AR.V7..Baseline. %in% c('Neg.', 'Und.'), 'Neg. / Und.', 'Pos.'))
+
+fit.PosVsNeg <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.PosVsNeg)
 names(fit.PosVsNeg$strata) <-  c('AR-V7 (Neg. / Und.)', 'AR-V7 Pos.')
 
 # Calculate HR.
-fit.PosVsNeg.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.Survival %>% dplyr::mutate(AR.V7..Baseline. = ifelse(AR.V7..Baseline. %in% c('Neg.', 'Und.'), 'Neg. / Und.', 'Pos.')))
+fit.PosVsNeg.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.PosVsNeg)
 
-plotFits$fit.PosVsNeg <- plotSurvival(fit.PosVsNeg, ylim = 45, hr = fit.PosVsNeg.hr)
+plotFits$fit.PosVsNeg <- plotSurvival(fit.PosVsNeg, ylim = 45, data = data.PosVsNeg, hr = fit.PosVsNeg.hr)
 
 
 # Survival - Caba-treated (per AR-V7 conversion) --------------------------
 
-fit.BetweenConversion <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7.Conversion, data = data.Survival %>% dplyr::filter(Inclusion..Treated.with.Caba. == 'Yes'))
+data.BetweenConversion <- data.Survival %>% dplyr::filter(Inclusion..Treated.with.Caba. == 'Yes')
+fit.BetweenConversion <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7.Conversion, data = data.BetweenConversion)
 names(fit.BetweenConversion$strata) <-  c('AR-V7 Conversion (Pos. -> Neg.)', 'AR-V7 Retainment (Pos. -> Pos.)')
 
 # Calculate HR.
-fit.BetweenConversion.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7.Conversion, data = data.Survival %>% dplyr::filter(Inclusion..Treated.with.Caba. == 'Yes'))
+fit.BetweenConversion.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7.Conversion, data = data.BetweenConversion)
 
 # Plot.
-plotFits$fit.BetweenConversion <- plotSurvival(fit.BetweenConversion, ylim = 21, hr = fit.BetweenConversion.hr)
+plotFits$fit.BetweenConversion <- plotSurvival(fit.BetweenConversion, ylim = 21, data = data.BetweenConversion, hr = fit.BetweenConversion.hr)
 
 
 # Combine plots. ----------------------------------------------------------
@@ -179,143 +182,36 @@ data.Survival %>%
     )
 
 
-
-# Compare against previous study ------------------------------------------
-
-ctcDataPrevious <- readr::read_tsv('Misc./ctcPreviousStudies.txt')
-ctcDataNew <- data.Patient$Overview %>% dplyr::select(`Subject Number`, `AR-V7 (Baseline)`, `CTC Count (Baseline – 7.5mL)`) %>% dplyr::mutate(Study = 'CABA-V7') %>% dplyr::filter(`Subject Number` != '42.2')
-
-dataCombined <- dplyr::bind_rows(ctcDataNew, ctcDataPrevious)
-
-plotCTC.All <- dataCombined %>%
-    dplyr::filter(`AR-V7 (Baseline)` != 'Und.') %>%
-    dplyr::filter(Study != 'PRELUDE') %>%
-    dplyr::group_by(`AR-V7 (Baseline)`) %>% dplyr::mutate(median = median(`CTC Count (Baseline – 7.5mL)`)) %>% dplyr::ungroup() %>%
-    ggplot(aes(x = `AR-V7 (Baseline)`, y = `CTC Count (Baseline – 7.5mL)`, fill = `AR-V7 (Baseline)`, label = median)) +
-    geom_hline(aes(yintercept = 5), color = '#F78A02', lty = '11') +
-    gghalves::geom_half_boxplot(side = 'l', outlier.shape = NA, notch = F, show.legend = F) +
-    gghalves::geom_half_point_panel(side = 'r', size = 1) +
-    scale_fill_manual(values = c('Pos.' = '#F61C54', 'Neg.' = '#0147B2', 'Und.' = '#E9B577'), guide = guide_legend(title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
-    stat_summary(fun=median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-4, angle = 90, hjust = .5) +
-    scale_shape_manual(values = c('Und.' = 19, 'Pos.' = 24, 'Neg.' = 25), guide = guide_legend(title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
-    scale_y_continuous(trans = scales::pseudo_log_trans(), breaks = c(0, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000), limits = c(0, 10000)) +
-    ggsignif::geom_signif(comparisons = list(c('Pos.', 'Neg.')), step_increase = .025, color = 'black', map_signif_level = F, test = 'wilcox.test', tip_length = .01) +
-    theme_Job
-
-plotCTC.AllMin5 <- dataCombined %>%
-    dplyr::filter(`CTC Count (Baseline – 7.5mL)` >= 5, `AR-V7 (Baseline)` != 'Und.') %>%
-    dplyr::filter(Study != 'PRELUDE') %>%
-    dplyr::group_by(`AR-V7 (Baseline)`) %>% dplyr::mutate(median = median(`CTC Count (Baseline – 7.5mL)`)) %>% dplyr::ungroup() %>%
-    ggplot(aes(x = `AR-V7 (Baseline)`, y = `CTC Count (Baseline – 7.5mL)`, fill = `AR-V7 (Baseline)`, color = Study, group = `AR-V7 (Baseline)`, label = median)) +
-    gghalves::geom_half_boxplot(side = 'l', outlier.shape = NA, notch = F, show.legend = F) +
-    gghalves::geom_half_point_panel(side = 'r', size = 1) +
-    scale_fill_manual(values = c('Pos.' = '#F61C54', 'Neg.' = '#0147B2', 'Und.' = '#E9B577'), guide = guide_legend(title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
-    stat_summary(fun=median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-4, angle = 90, hjust = .5) +
-    scale_shape_manual(values = c('Und.' = 19, 'Pos.' = 24, 'Neg.' = 25), guide = guide_legend(title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
-    scale_y_continuous(trans = scales::pseudo_log_trans(), breaks = c(0, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000),  limits = c(0, 10000)) +
-    ggsignif::geom_signif(comparisons = list(c('Pos.', 'Neg.')), y_position = 9.1, step_increase = .025, color = 'black', map_signif_level = F, test = 'wilcox.test', tip_length = .01) +
-    theme_Job
-
-plot.CTCPerStudy <- dataCombined %>%
-    dplyr::filter(`CTC Count (Baseline – 7.5mL)` >= 5, `AR-V7 (Baseline)` != 'Und.') %>%
-    dplyr::group_by(`AR-V7 (Baseline)`, Study) %>% dplyr::mutate(median = median(`CTC Count (Baseline – 7.5mL)`)) %>% dplyr::ungroup() %>%
-    ggplot(aes(x = `AR-V7 (Baseline)`, y = `CTC Count (Baseline – 7.5mL)`, fill = `AR-V7 (Baseline)`, label = median)) +
-    gghalves::geom_half_boxplot(side = 'l', outlier.shape = NA, notch = F, show.legend = F) +
-    gghalves::geom_half_point_panel(side = 'r', size = 1) +
-    scale_fill_manual(values = c('Pos.' = '#F61C54', 'Neg.' = '#0147B2', 'Und.' = '#E9B577'), guide = guide_legend(title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
-    stat_summary(fun=median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-2, angle = 90, hjust = .5) +
-    scale_shape_manual(values = c('Und.' = 19, 'Pos.' = 24, 'Neg.' = 25), guide = guide_legend(title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
-    scale_y_continuous(trans = scales::pseudo_log_trans(), breaks = c(0, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000),  limits = c(0, 10000)) +
-    ggsignif::geom_signif(comparisons = list(c('Pos.', 'Neg.')), y_position = 9, step_increase = .025, color = 'black', map_signif_level = F, test = 'wilcox.test', tip_length = .01) +
-    theme_Job +
-    facet_grid(~ Study)
-
-## Combine landscape tracks.
-layout <- "AB
-CC"
-
-plotCTC.All + plotCTC.AllMin5 + plot.CTCPerStudy +
-    patchwork::plot_layout(design = layout, nrow = 2, guides = 'auto') +
-    patchwork::plot_annotation(tag_levels = 'a')
-
-
-
-# Sup. Fig. X - Correlation to OS -----------------------------------------
+# Sup. Fig. 2 - CTC and Z against OS -----------------------------------------
 
 plots.SupFigX <- list()
 
 ## OS vs. grouped CTC-count (Baseline) ----
 
-data.OSvsCTC <- data.Survival %>%
-    dplyr::distinct(Subject.Number, Survival, monthsFromPreScreeningToEnd, CTC.Count..Baseline...7.5mL.) %>%
-    dplyr::filter(Survival == 1) %>%
-    dplyr::mutate(
-        g = ifelse(CTC.Count..Baseline...7.5mL. >= 5, 'CTC count ≥5', 'CTC count <5'),
-        monthsFromPreScreeningToEnd = as.numeric(monthsFromPreScreeningToEnd),
-    ) %>%
-    dplyr::group_by(g) %>%
-    dplyr::mutate(
-        median = round(median(monthsFromPreScreeningToEnd), 1),
-        g = sprintf('%s<br>(<i>n</i> = %s)', g, dplyr::n_distinct(Subject.Number))
-    ) %>%
-    dplyr::ungroup()
+data.CTC <- data.Survival %>% dplyr::mutate(ctcCategory = ifelse(CTC.Count..Baseline...7.5mL. >= 5, 'CTC count ≥5', 'CTC count <5'))
+fit.CTC <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategory, data = data.CTC)
+names(fit.CTC$strata) <-  c('CTC count <5<br>(Baseline)', 'CTC count ≥5<br>(Baseline)')
 
-stat.data.OSvsCTC <- data.OSvsCTC %>%
-    rstatix::wilcox_test(monthsFromPreScreeningToEnd ~ g, exact = T, p.adjust.method = 'none', detailed = T, paired = F) %>%
-    rstatix::adjust_pvalue(method = 'BH') %>%
-    rstatix::add_significance(cutpoints = c(0, 0.001, 0.01, 0.05, 1), symbols = c('***', '**', '*', 'ns'))
+# Calculate HR.
+fit.CTC.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategory, data = data.CTC)
 
+plotFits$fit.CTC.hr <- plotSurvival(fit.CTC, ylim = 45, data = data.CTC, hr = fit.CTC.hr)
 
-plots.SupFigX$OSvsCTC <- ggplot2::ggplot(data.OSvsCTC, aes(x = g, y = monthsFromPreScreeningToEnd, label = median, fill = g)) +
-
-    # Add half-half plots with median labels.
-    gghalves::geom_half_boxplot(side = 'l', outlier.shape = NA, notch = F, show.legend = F) +
-    gghalves::geom_half_point_panel(side = 'r', size = 1.25, color = 'black') +
-    ggplot2::stat_summary(fun = median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-5, angle = 90, hjust = .5) +
-    ggpubr::geom_bracket(aes(xmin = group1, xmax = group2, label = p.adj.signif, fill = NULL, color = NULL, shape = NULL), data = stat.data.OSvsCTC, y.position = 33, step.increase = .02, tip.length = .01) +
-
-    ggplot2::scale_fill_manual(values = c('CTC count <5<br>(<i>n</i> = 26)' = 'black', 'CTC count ≥5<br>(<i>n</i> = 70)' = 'grey50'), guide = F) +
-    ggplot2::labs(x = 'CTC Count (Baseline)<br>On non-censured patients (<i>n</i> = 96)', y = 'Overall Survival (months)') +
-    ggplot2::scale_y_continuous(limits = c(0, 35), breaks = seq(0, 35, by = 5)) +
-    theme_Job
 
 ## OS vs. grouped Z-score (Baseline) ----
 
-data.OSvsZ <- data.Survival %>%
-    dplyr::distinct(Subject.Number, Survival, monthsFromPreScreeningToEnd, Genome.wide.status..Baseline., Genome.Wide.Z.Score..Baseline.) %>%
-    dplyr::filter(Genome.Wide.Z.Score..Baseline. != '.', Survival == 1) %>%
-    dplyr::mutate(
-        Genome.Wide.Z.Score..Baseline. = as.numeric(Genome.Wide.Z.Score..Baseline.),
-        monthsFromPreScreeningToEnd = as.numeric(monthsFromPreScreeningToEnd)
-    ) %>%
-    dplyr::group_by(Genome.wide.status..Baseline.) %>%
-    dplyr::mutate(
-        median = round(median(monthsFromPreScreeningToEnd), 1),
-        g = sprintf('%s<br>(<i>n</i> = %s)', Genome.wide.status..Baseline., dplyr::n_distinct(Subject.Number))
-    ) %>%
-    dplyr::ungroup()
+data.Z <- data.Survival %>% dplyr::filter(Genome.Wide.Z.Score..Baseline. != '.') %>% dplyr::mutate(zCategory = ifelse(Genome.Wide.Z.Score..Baseline. >= 5, 'Genome-wide Z-score ≥5', 'Genome-wide Z-score <5'))
+fit.Z <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ zCategory, data = data.Z)
+names(fit.Z$strata) <-  c('Aneuploidy score <5<br>(Baseline)', 'Aneuploidy ≥5<br>(Baseline)')
 
-stat.data.OSvsZ <- data.OSvsZ %>%
-    rstatix::wilcox_test(monthsFromPreScreeningToEnd ~ g, exact = T, p.adjust.method = 'none', detailed = T, paired = F) %>%
-    rstatix::adjust_pvalue(method = 'BH') %>%
-    rstatix::add_significance(cutpoints = c(0, 0.001, 0.01, 0.05, 1), symbols = c('***', '**', '*', 'ns'))
+# Calculate HR.
+fit.Z.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ zCategory, data = data.Z)
 
-
-plots.SupFigX$OSvsZ <- ggplot2::ggplot(data.OSvsZ, aes(x = g, y = monthsFromPreScreeningToEnd, label = median, fill = g)) +
-
-    # Add half-half plots with median labels.
-    gghalves::geom_half_boxplot(side = 'l', outlier.shape = NA, notch = F, show.legend = F) +
-    gghalves::geom_half_point_panel(side = 'r', size = 1.25, color = 'black') +
-    ggplot2::stat_summary(fun = median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-5, angle = 90, hjust = .5) +
-    ggpubr::geom_bracket(aes(xmin = group1, xmax = group2, label = p.adj.signif, fill = NULL, color = NULL, shape = NULL), data = stat.data.OSvsZ, y.position = 33, step.increase = .02, tip.length = .01) +
-
-    ggplot2::scale_fill_manual(values = c('Genome-wide Z-score <5<br>(<i>n</i> = 37)' = 'black', 'Genome-wide Z-score ≥5<br>(<i>n</i> = 56)' = 'grey50'), guide = F) +
-    ggplot2::labs(x = 'Genome-wide status (Baseline)<br>On non-censured patients with mFAST-SeqS (<i>n</i> = 93)', y = 'Overall Survival (months)') +
-    ggplot2::scale_y_continuous(limits = c(0, 35), breaks = seq(0, 35, by = 5)) +
-    theme_Job
+plotFits$fit.Z.hr <- plotSurvival(fit.Z, ylim = 45, data = data.Z, hr = fit.Z.hr)
 
 
 ## Combine plots ----
-plots.SupFigX$OSvsCTC + plots.SupFigX$OSvsZ +
-    patchwork::plot_layout(nrow = 1, guides = 'auto') +
+plotFits$fit.CTC.hr$plot + plotFits$fit.Z.hr$plot +
+    plotFits$fit.CTC.hr$table + plotFits$fit.Z.hr$table +
+    patchwork::plot_layout(heights = c(1, .25), nrow = 2, guides = 'auto') +
     patchwork::plot_annotation(tag_levels = 'a')

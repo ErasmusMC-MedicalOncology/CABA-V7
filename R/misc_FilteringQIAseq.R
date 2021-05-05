@@ -41,10 +41,13 @@ unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(list.files('/mnt/data2/hart
     # Fix annotations.
     data <- data %>% dplyr::mutate(`[15]ann_annotation_Job` = gsub('\\|.*', '', `[15]ann_annotation`))
 
+    # Remove duplicates (if any)
+    data <- data %>% dplyr::distinct()
+
     # Return cleaned data.
     return(data)
 
-}, cl = 20))
+}, cl = 5))
 
 
 # Perform filtering. ------------------------------------------------------
@@ -52,7 +55,7 @@ unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(list.files('/mnt/data2/hart
 ## Determine whether mutations overlap the panel-design. ----
 
 regions.panel <- c(rtracklayer::import.bed('Misc./QIAseq_DNA_panel.CDHS-25058Z-3602.primers-150bphg38.bed'), rtracklayer::import.bed('Misc./QIAseq_DNA_panel.CDHS-25058Z-3602.roihg38.bed'))
-strand(regions.panel) <- '*'
+BiocGenerics::strand(regions.panel) <- '*'
 
 regions.panel <- GenomicRanges::reduce(regions.panel)
 
@@ -69,7 +72,7 @@ unfilteredMuts$withinPanel <- unfilteredMuts$ID_Job %in% overlappingPanel$ID_Job
 HMF.PON <- VariantAnnotation::readVcfAsVRanges('/mnt/data2/hartwig/DR71/Misc/SageGermlinePon.98x.38.vcf.gz')
 HMF.PON.Filtered <- IRanges::subsetByOverlaps(HMF.PON, muts.Gr)
 HMF.PON.Filtered <- HMF.PON.Filtered[HMF.PON.Filtered$PON_COUNT >= 10 & HMF.PON.Filtered$PON_MAX >= 5]
-HMF.PON.Filtered$ID_Job <- sprintf('%s.%s:%s>%s', seqnames(HMF.PON.Filtered), start(HMF.PON.Filtered), VariantAnnotation::ref(HMF.PON.Filtered), VariantAnnotation::alt(HMF.PON.Filtered))
+HMF.PON.Filtered$ID_Job <- sprintf('%s.%s:%s>%s', GenomeInfoDb::seqnames(HMF.PON.Filtered), BiocGenerics::start(HMF.PON.Filtered), VariantAnnotation::ref(HMF.PON.Filtered), VariantAnnotation::alt(HMF.PON.Filtered))
 
 # Add to table.
 unfilteredMuts$inPON <- unfilteredMuts$ID_Job %in% HMF.PON.Filtered$ID_Job
@@ -108,4 +111,4 @@ filteredMuts <- filteredMuts %>%
     dplyr::mutate(totalCaba = dplyr::n_distinct(lcode)) %>%
     dplyr::ungroup()
 
-write.table(filteredMuts, file = 'asd.txt', quote = F, sep = '\t', row.names = F)
+write.table(filteredMuts, file = 'filteredMuts.txt', quote = F, sep = '\t', row.names = F)
