@@ -1,5 +1,5 @@
 # Author:                      Job van Riet
-# Date:                        29-04-2021
+# Date:                        05-05-2021
 # Function:                    Import unfiltered QIAseq mutations, add the CPCT-02 mPRAD incidence and perform filtering.
 
 
@@ -12,15 +12,19 @@ library(ggplot2)
 
 # Import data -------------------------------------------------------------
 
+biomicsIDs <- readr::read_tsv('Misc./biomicsIDs.txt')
+vcfFiles <- list.files('/mnt/data2/hartwig/DR71/Misc/Annotated/', pattern = 'tsv.gz$', full.names = T)
+vcfFiles <- vcfFiles[grepl(paste(biomicsIDs$biomicsID, collapse = '|'), vcfFiles)]
+
 # Import unfiltered QIAseq mutations.
-unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(list.files('/mnt/data2/hartwig/DR71/Misc/Annotated/', pattern = 'tsv.gz$', full.names = T), function(x){
+unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(vcfFiles, function(x){
 
     # Import.
     data <- readr::read_tsv(x, guess_max = 299999, trim_ws = T)
-    data$lcode <- gsub('.ann.tsv.gz', '', basename(x))
+    data$biomicsID <- gsub('.ann.tsv.gz', '', basename(x))
 
     # Clean-up columns.
-    colnames(data) <- gsub('# ', '', gsub('-|:', '', gsub(unique(data$lcode), '', colnames(data))))
+    colnames(data) <- gsub('# ', '', gsub('-|:', '', gsub(unique(data$biomicsID), '', colnames(data))))
 
     # Filter non-standard chromosomes.
     data <- data %>% dplyr::filter(`[1]CHROM` %in% c(1:22, 'X', 'Y'))
@@ -41,13 +45,26 @@ unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(list.files('/mnt/data2/hart
     # Fix annotations.
     data <- data %>% dplyr::mutate(`[15]ann_annotation_Job` = gsub('\\|.*', '', `[15]ann_annotation`))
 
+    # Fix gnoMAD AF.
+    data <- data %>% dplyr::mutate(
+        `[11]non_cancer_AF` = as.numeric(`[11]non_cancer_AF`),
+        `[11]non_cancer_AF` = ifelse(is.na(`[11]non_cancer_AF`), 0, `[11]non_cancer_AF`)
+    )
+
     # Remove duplicates (if any)
     data <- data %>% dplyr::distinct()
+
+    # Add corresponding L-code.
+    data <- data %>% dplyr::left_join(biomicsIDs)
 
     # Return cleaned data.
     return(data)
 
-}, cl = 5))
+}, cl = 10))
+
+# Only retain included samples.
+data.Patients <- readxl::read_excel('Misc./Suppl. Table 1 - Overview of Data.xlsx', trim_ws = T, skip = 1, sheet = 'Sample Overview')
+unfilteredMuts <- unfilteredMuts %>% dplyr::filter(!is.na(`L-code`), `L-code` %in% data.Patients$`L-code`)
 
 
 # Perform filtering. ------------------------------------------------------
@@ -77,6 +94,10 @@ HMF.PON.Filtered$ID_Job <- sprintf('%s.%s:%s>%s', GenomeInfoDb::seqnames(HMF.PON
 # Add to table.
 unfilteredMuts$inPON <- unfilteredMuts$ID_Job %in% HMF.PON.Filtered$ID_Job
 
+## Determine whether COSMIC has listed the mutations as SNP ----
+
+cosmicSNPs <- readr::read_tsv('/mnt/data2/hartwig/DR71/Misc/cosmicSNPs.txt', col_names = 'ID', skip = 1)
+unfilteredMuts$cosmicSNP <- unfilteredMuts$`[3]ID` %in% cosmicSNPs$ID
 
 ## Perform filtering. ----
 
@@ -95,11 +116,15 @@ filteredMuts <- unfilteredMuts %>%
         # Filter on coding.
         `[18]ann_hgvs_p` != '.',
         # Only take known COSMIC mutations.
-        grepl('COS', `[3]ID`)
+        grepl('COS', `[3]ID`),
+        # Remove gnomad non-cancer variants.
+        `[11]non_cancer_AF` <= 0.025,
+        # Remove COSMIC SNPs.
+        !cosmicSNP
     ) %>%
     # Filter on incidence within CABA-V7 samples.
     dplyr::group_by(ID_Job) %>%
-    dplyr::mutate(totalCaba = dplyr::n_distinct(lcode)) %>%
+    dplyr::mutate(totalCaba = dplyr::n_distinct(`L-code`)) %>%
     dplyr::ungroup() %>%
     dplyr::filter(totalCaba <= 30)
 
@@ -108,7 +133,7 @@ filteredMuts <- unfilteredMuts %>%
 
 filteredMuts <- filteredMuts %>%
     dplyr::group_by(ID_Job) %>%
-    dplyr::mutate(totalCaba = dplyr::n_distinct(lcode)) %>%
+    dplyr::mutate(totalCaba = dplyr::n_distinct(`L-code`)) %>%
     dplyr::ungroup()
 
 write.table(filteredMuts, file = 'filteredMuts.txt', quote = F, sep = '\t', row.names = F)

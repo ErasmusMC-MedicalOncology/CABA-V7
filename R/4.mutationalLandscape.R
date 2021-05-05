@@ -1,5 +1,5 @@
 # Author:                      Job van Riet
-# Date:                        03-03-2021
+# Date:                        05-05-2021
 # Function:                    Generate an oncoplot of the (coding) QIASeq mutations.
 
 
@@ -21,17 +21,16 @@ data.Patient <- list()
 data.Patient$Overview <- readxl::read_excel('Misc./Suppl. Table 1 - Overview of Data.xlsx', trim_ws = T, skip = 1, sheet = 'Sample Overview') %>% dplyr::mutate(`Subject Number` = as.character(`Subject Number`))
 data.Patient$clinicalData <- readxl::read_excel('Misc./Suppl. Table 1 - Overview of Data.xlsx', trim_ws = T, sheet = 'Clinical Characteristics') %>% dplyr::mutate(`Subject Number` = as.character(`Subject Number`))
 
-# (Filtered) QiaSeq mutations.
+# (Filtered) QIAseq mutations.
 dataMuts <- readxl::read_excel('Misc./Suppl. Table 1 - Overview of Data.xlsx', trim_ws = T, sheet = 'QIASeq - Filtered')
-dataMuts <- dataMuts %>% dplyr::filter(`L-code` %in% data.Patient$Overview$`L-code`)
 
 
 # Clean-up data -----------------------------------------------------------
 
 ## Clean-up mutational consequences ----
 dataMuts <- dataMuts %>% dplyr::mutate(
-    SYMBOL = `[18]SYMBOL`,
-    mutType = gsub('\\|.*', '', `[16]ann_annotation`),
+    SYMBOL = ann_gene_name_Job,
+    mutType = gsub('\\|.*', '', `ann_annotation_Job`),
     mutType = gsub('&.*', '', mutType),
     mutType = ifelse(grepl('splice', mutType), 'Splicing variant', gsub('_', ' ', Hmisc::capitalize(mutType))))
 
@@ -67,8 +66,8 @@ dataOncoplot <- dataOncoplot %>%
         dataMuts %>%
             dplyr::group_by(`L-code`) %>%
             dplyr::summarise(
-                totalMuts = dplyr::n_distinct(`[4]ID`),
-                maxVAF = base::max(`[34]consensus-5:AF`, na.rm = T)
+                totalMuts = dplyr::n_distinct(ID_Job),
+                maxVAF = base::max(consensus5AF_Job, na.rm = T)
             )
     )
 
@@ -81,7 +80,6 @@ memoData <- R2CCBC::memoSort(memoData)
 dataOncoplot$SYMBOL <- factor(dataOncoplot$SYMBOL, levels = rev(rownames(memoData)))
 dataOncoplot$`L-code` <- factor(dataOncoplot$`L-code`, levels = colnames(memoData))
 
-
 # Calc. Mut. Excl. Genes. -------------------------------------------------
 
 dataFisher <- dataOncoplot %>%
@@ -93,6 +91,9 @@ dataFisher <- dataOncoplot %>%
     ) %>%
     dplyr::ungroup() %>%
     dplyr::filter(`AR-V7 (Baseline)` != 'Und.')
+
+# Only test genes in which at least 10% of the group has mutations.
+dataFisher <- dataFisher %>% dplyr::filter(SYMBOL %in% dataFisher[(dataFisher$totalMut / dataFisher$totalInGroup) >= .05,]$SYMBOL)
 
 # Perform Fisher's Exact Test
 dataFisher.Results <- do.call(rbind, lapply(unique(dataFisher$SYMBOL), function(gene){
@@ -160,11 +161,11 @@ tracks.oncoplot$frequency <- dataOncoplot %>%
     dplyr::distinct() %>%
     ggplot2::ggplot(aes(x = SYMBOL, fill = `AR-V7 (Baseline)`, y = totalWithMut)) +
     ggplot2::geom_bar(stat = 'identity', lwd = .33, color = 'black', width = .7) +
-    ggplot2::scale_y_continuous(limits = c(0, 45.1), breaks = c(0, 10, 20, 30, 40, 45), expand = c(0,0)) +
+    ggplot2::scale_y_continuous(limits = c(0, 30.1), breaks = c(0, 10, 20, 30), expand = c(0,0)) +
     ggplot2::labs(x = NULL, y = '\\# Mutant samples') +
-    ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), na.value = 'white') +
+    ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     ggplot2::coord_flip() +
-    theme_Job + theme(axis.text.x = ggplot2::element_text(size = 5, angle = 0, hjust = .5), axis.text.y = ggplot2::element_blank())
+    theme_Job + theme(axis.text.y = ggplot2::element_blank())
 
 
 ## Number of coding mutations ----
@@ -172,7 +173,7 @@ tracks.oncoplot$TMB <- dataOncoplot %>%
     dplyr::distinct(`L-code`, totalMuts) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = totalMuts)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#F7EAC6', lwd = .33, width = .6) +
-    ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, 2, 4, 6, 8, 10), limits = c(0, 10.1)) +
+    ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, 2, 4, 6, 8, 10), limits = c(0, 8.1)) +
     ggplot2::labs(y = 'Nr. of<br>coding mutation(s)') +
     themeTrack_Job
 
@@ -182,7 +183,7 @@ tracks.oncoplot$maxVAF <- dataOncoplot %>%
     dplyr::distinct(`L-code`, maxVAF) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = maxVAF)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#95C7D9', lwd = .33, width = .6) +
-    ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, .2, .4, .6, .8, 1), limits = c(0, 1.1)) +
+    ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, .2, .4, .6, .8, 1), limits = c(0, 1.01)) +
     ggplot2::labs(y = 'Max. VAF of<br> coding mutation(s)') +
     themeTrack_Job
 
@@ -207,13 +208,14 @@ tracks.oncoplot$cfDNA <- dataOncoplot %>%
     themeTrack_Job
 
 ## Oncoplot ----
+
 tracks.oncoplot$oncoplot <- dataOncoplot %>% ggplot(aes(x = `L-code`, y = SYMBOL, fill = mutType)) +
     ggplot2::geom_tile(lwd = .2, width = .8, height = .8, color = 'grey95', na.rm = T) +
     # Colors of mutations.
     ggplot2::scale_fill_manual(values = colorMuts, drop = T) +
     ggplot2::labs(x = 'Samples (CABA-V7) processed with target-panel (QIASeq)<br>(cfDNA; <i>n</i> = 131)', y = 'Genes') +
     # Legend settings.
-    ggplot2::guides( fill = guide_legend(title = 'Mutational Categories', title.position = 'top', title.hjust = 0.5, ncol = 3, keywidth = 0.5, keyheight = 0.5)) +
+    ggplot2::guides( fill = guide_legend(title = 'Mutational Categories', title.position = 'top', title.hjust = 0.5, ncol = 2, keywidth = 0.5, keyheight = 0.5)) +
     theme_Job +
     ggplot2::theme(
         axis.text.y = element_text(size = 7, family = 'Helvetica', face = 'bold'),
@@ -226,18 +228,18 @@ tracks.oncoplot$oncoplot <- dataOncoplot %>% ggplot(aes(x = `L-code`, y = SYMBOL
 ## Genome-wide Z-score ----
 tracks.oncoplot$genomeWideZT1 <- dataOncoplot %>%
     dplyr::distinct(`L-code`, `Genome-wide status (Baseline)` ) %>%
-    ggplot2::ggplot(., aes(x = `L-code`, y = 'Genome-wide status (Baseline)', fill = `Genome-wide status (Baseline)`)) +
+    ggplot2::ggplot(., aes(x = `L-code`, y = 'Aneuploidy status (Baseline)', fill = `Genome-wide status (Baseline)`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('Genome-wide Z-score <5' = 'black', 'Genome-wide Z-score ≥5' = 'grey70')) +
+    ggplot2::scale_fill_manual(values = c('Aneuploidy score <5' = 'black', 'Aneuploidy score ≥5' = 'grey70'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 tracks.oncoplot$genomeWideZT2 <- dataOncoplot %>%
     dplyr::distinct(`L-code`, `Genome-wide status (T2)`) %>%
-    ggplot2::ggplot(., aes(x = `L-code`, y = 'Genome-wide status (Baseline - T2)', fill = `Genome-wide status (T2)`)) +
+    ggplot2::ggplot(., aes(x = `L-code`, y = 'Aneuploidy status (Baseline - T2)', fill = `Genome-wide status (T2)`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('Genome-wide Z-score <5' = 'black', 'Genome-wide Z-score ≥5' = 'grey70')) +
+    ggplot2::scale_fill_manual(values = c('Aneuploidy score <5' = 'black', 'Aneuploidy score ≥5' = 'grey70'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 ## Baseline characteristics ----
@@ -247,7 +249,7 @@ tracks.oncoplot$baseline <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'AR-V7 (Baseline)', fill = `AR-V7 (Baseline)`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), na.value = 'white') +
+    ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 ## Conversion status ----
@@ -257,7 +259,7 @@ tracks.oncoplot$Conversion <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'AR-V7 Conversion', fill = `AR-V7 Conversion`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('Neg.' = 'black', 'Pos.' = 'grey70'), na.value = 'white') +
+    ggplot2::scale_fill_manual(values = c('Neg.' = '#00A94D', 'Pos.' = '#FE6100'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 ## Responses ----
@@ -267,7 +269,7 @@ tracks.oncoplot$responseCTC <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'Response CTC', fill = `Response CTC`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('black', 'grey75'), na.value = 'white') +
+    ggplot2::scale_fill_manual(values = c('black', 'grey75'), na.value = 'white', guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 tracks.oncoplot$responseCTCDecline <- dataOncoplot %>%
@@ -275,7 +277,7 @@ tracks.oncoplot$responseCTCDecline <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'Response CTC-Decline', fill = `Response CTC-Decline`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('black', 'grey75'), na.value = 'white') +
+    ggplot2::scale_fill_manual(values = c('black', 'grey75'), na.value = 'white', guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 tracks.oncoplot$responsePSA <- dataOncoplot %>%
@@ -283,7 +285,7 @@ tracks.oncoplot$responsePSA <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'Response PSA', fill = `Response PSA`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
-    ggplot2::scale_fill_manual(values = c('black', 'grey75'), na.value = 'white') +
+    ggplot2::scale_fill_manual(values = c('black', 'grey75'), na.value = 'white', guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     themeAnno_Job
 
 
