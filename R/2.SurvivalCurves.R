@@ -215,3 +215,26 @@ plotFits$fit.CTC.hr$plot + plotFits$fit.Z.hr$plot +
     plotFits$fit.CTC.hr$table + plotFits$fit.Z.hr$table +
     patchwork::plot_layout(heights = c(1, .25), nrow = 2, guides = 'auto') +
     patchwork::plot_annotation(tag_levels = 'a')
+
+
+# CTC / Z T1 vs. T2 -------------------------------------------------------
+
+data.Z <- data.Survival %>%
+    dplyr::filter(Genome.Wide.Z.Score..Baseline. != '.') %>%
+    dplyr::mutate(
+        zCategory.T1 = ifelse(Genome.Wide.Z.Score..Baseline. >= 5, 'Genome-wide Z-score ≥5', 'Genome-wide Z-score <5'),
+        zCategory.T2 = ifelse(Genome.Wide.Z.Score..T2. >= 5, 'Genome-wide Z-score ≥5', 'Genome-wide Z-score <5'),
+        convStatus  = ifelse(zCategory.T1 == 'Genome-wide Z-score ≥5' & zCategory.T2 == 'Genome-wide Z-score ≥5', 'T1 and T2 > 5', 'Other'),
+        convStatus  = ifelse(zCategory.T1 == 'Genome-wide Z-score <5' & zCategory.T2 == 'Genome-wide Z-score ≥5', 'T1 < 5, T2 > 5', convStatus),
+        convStatus  = ifelse(zCategory.T1 == 'Genome-wide Z-score <5' & zCategory.T2 == 'Genome-wide Z-score <5', 'T1 < 5, T2 < 5', convStatus),
+        convStatus  = ifelse(zCategory.T1 == 'Genome-wide Z-score ≥5' & zCategory.T2 == 'Genome-wide Z-score <5', 'T1 > 5, T2 < 5', convStatus)
+    )
+
+fit.Z <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ convStatus, data = data.Z)
+names(fit.Z$strata) <-  c('Aneuploidy score <5<br>(Baseline)', 'Aneuploidy ≥5<br>(Baseline)')
+
+# Calculate HR.
+fit.Z.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ convStatus, data = data.Z)
+
+plotFits$fit.Z.hr <- plotSurvival(fit.Z, ylim = 22, data = data.Z, hr = fit.Z.hr)
+
