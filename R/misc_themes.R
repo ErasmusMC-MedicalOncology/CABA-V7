@@ -51,5 +51,9 @@ colorMuts <- c(
     'Stop gained' = '#4897D8', # Blue
     'Missense variant' = '#000000', # Black
     'Splicing variant' ='#F9A603', # Orange
-    'Multiple mutations' = 'red' # Red
+    'Multiple mutations' = 'red', # Red
+    'Frameshift variant' = '#0B1251',
+    'Conservative inframe deletion' = 'skyblue',
+    'Disruptive inframe deletion' = '#F399BE',
+    'Disruptive inframe insertion' = 'pink'
 )

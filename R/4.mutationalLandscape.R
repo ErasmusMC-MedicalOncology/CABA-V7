@@ -1,5 +1,5 @@
 # Author:                      Job van Riet
-# Date:                        05-05-2021
+# Date:                        14-06-2021
 # Function:                    Generate an oncoplot of the (coding) QIASeq mutations.
 
 
@@ -29,8 +29,8 @@ dataMuts <- readxl::read_excel('Misc./Suppl. Table 1 - Overview of Data.xlsx', t
 
 ## Clean-up mutational consequences ----
 dataMuts <- dataMuts %>% dplyr::mutate(
-    SYMBOL = ann_gene_name_Job,
-    mutType = gsub('\\|.*', '', `ann_annotation_Job`),
+    SYMBOL = ann_gene_name,
+    mutType = gsub('\\|.*', '', `ann_annotation`),
     mutType = gsub('&.*', '', mutType),
     mutType = ifelse(grepl('splice', mutType), 'Splicing variant', gsub('_', ' ', Hmisc::capitalize(mutType))))
 
@@ -45,8 +45,9 @@ dataOncoplot <- dataMuts %>%
     dplyr::ungroup()
 
 ## Complete the data. ----
+
 dataOncoplot <- dataOncoplot %>%
-    dplyr::mutate(`L-code` = factor(`L-code`, levels = unique(data.Patient$Overview %>% dplyr::filter(`L-code` != 'N/A') %>% dplyr::pull(`L-code`)))) %>%
+    dplyr::mutate(`L-code` = factor(`L-code`, levels = unique(data.Patient$Overview %>% dplyr::mutate(`L-code` = `L-code (T1)`) %>% dplyr::filter(`L-code` != 'N/A') %>% dplyr::pull(`L-code`)))) %>%
     tidyr::complete(`L-code`, SYMBOL) %>%
     dplyr::mutate(
         isMutant = ifelse(is.na(isMutant), F, isMutant),
@@ -55,8 +56,9 @@ dataOncoplot <- dataOncoplot %>%
 
 
 ## Add patient metadata ----
+
 dataOncoplot <- dataOncoplot %>%
-    dplyr::left_join(data.Patient$Overview %>% dplyr::select(`Subject Number`, `L-code`, `cfDNA yield (ng)`, `Response CTC`, `Response CTC-Decline`, `CTC Count (Baseline – 7.5mL)`, `AR-V7 (Baseline)`, `AR-V7 Conversion`, `Genome-wide status (Baseline)`, `Genome-wide status (T2)`, `Inclusion (Treated with Caba)`), by = 'L-code') %>%
+    dplyr::left_join(data.Patient$Overview %>% dplyr::mutate(`L-code` = `L-code (T1)`) %>% dplyr::select(`Subject Number`, `L-code`, `cfDNA yield (ng)`, `Response CTC`, `Response CTC-Decline`, `CTC Count (Baseline – 7.5mL)`, `AR-V7 (Baseline)`, `AR-V7 Conversion`, `Genome-wide status (Baseline)`, `Genome-wide status (T2)`, `Inclusion (Treated with Caba)`), by = 'L-code') %>%
     dplyr::left_join(data.Patient$clinicalData %>% dplyr::select(`Subject Number`, `Response PSA`), by = 'Subject Number')
 
 
@@ -75,7 +77,7 @@ dataOncoplot <- dataOncoplot %>%
 memoData <- reshape2::dcast(dataOncoplot, SYMBOL~`L-code`, value.var = 'isMutant', fun.aggregate = sum)
 rownames(memoData) <- memoData$SYMBOL; memoData$SYMBOL <- NULL
 memoData[is.na(memoData)] <- 0
-memoData <- R2CCBC::memoSort(memoData)
+memoData <- R2CPCT::memoSort(memoData)
 
 dataOncoplot$SYMBOL <- factor(dataOncoplot$SYMBOL, levels = rev(rownames(memoData)))
 dataOncoplot$`L-code` <- factor(dataOncoplot$`L-code`, levels = colnames(memoData))
@@ -161,7 +163,7 @@ tracks.oncoplot$frequency <- dataOncoplot %>%
     dplyr::distinct() %>%
     ggplot2::ggplot(aes(x = SYMBOL, fill = `AR-V7 (Baseline)`, y = totalWithMut)) +
     ggplot2::geom_bar(stat = 'identity', lwd = .33, color = 'black', width = .7) +
-    ggplot2::scale_y_continuous(limits = c(0, 30.1), breaks = c(0, 10, 20, 30), expand = c(0,0)) +
+    ggplot2::scale_y_continuous(limits = c(0, 83), breaks = c(0, 20, 40, 60, 80), expand = c(0,0)) +
     ggplot2::labs(x = NULL, y = '\\# Mutant samples') +
     ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     ggplot2::coord_flip() +
@@ -173,7 +175,7 @@ tracks.oncoplot$TMB <- dataOncoplot %>%
     dplyr::distinct(`L-code`, totalMuts) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = totalMuts)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#F7EAC6', lwd = .33, width = .6) +
-    ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, 2, 4, 6, 8, 10), limits = c(0, 8.1)) +
+    ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, 5, 10, 15), limits = c(0, 16.1)) +
     ggplot2::labs(y = 'Nr. of<br>coding mutation(s)') +
     themeTrack_Job
 
