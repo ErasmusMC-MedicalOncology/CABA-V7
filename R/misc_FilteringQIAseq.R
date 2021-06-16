@@ -2,12 +2,15 @@
 # Date:                        14-06-2021
 # Function:                    Import unfiltered QIAseq mutations and perform (germline) filtering.
 
+# VCF files were first normalized / left-aligned using:
+# for VCF in *.ann.vcf.gz;
+# do echo "bcftools norm -f Homo_sapiens.GRCh38.dna.primary_assembly.fa -m -any -O v -o ${VCF/.gz/_normed.gz} ${VCF};"
+# done
 
 # Import libraries --------------------------------------------------------
 
-library(dplyr)
 library(plyr)
-library(ggplot2)
+library(dplyr)
 
 
 # Helper functions --------------------------------------------------------
@@ -64,11 +67,11 @@ readVCF.Biomics <- function(x){
 biomicsIDs <- readr::read_tsv('Misc./biomicsIDs.txt')
 
 # Import germline and somatic variants.
-vcfFiles <- list.files('//mnt/data2/hartwig/DR71/Misc/CABAV7', pattern = 'tsv.gz$', full.names = T)
+vcfFiles <- list.files('/mnt/data2/hartwig/DR71/Misc/CABAV7', pattern = 'ann.tsv.gz', full.names = T)
 vcfFiles <- vcfFiles[grepl(paste(biomicsIDs$biomicsID, collapse = '|'), vcfFiles)]
 
 # Import unfiltered QIAseq mutations.
-unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(vcfFiles, readVCF.Biomics, cl = 10))
+unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(vcfFiles, readVCF.Biomics, cl = 20))
 unfilteredMuts <- unfilteredMuts %>% dplyr::left_join(biomicsIDs)
 
 # Only retain included samples.
@@ -129,8 +132,6 @@ determineGermline <- function(x, PON){
     # If sample had no germline, use the PON.
     if(base::length(muts.Germline) == 0) muts.Germline <- PON %>% dplyr::pull(ID_Job)
 
-
-
     # Filter germline variants (or PON)
     x <- x %>% dplyr::mutate(germlineStatus = ifelse(Type == 'Somatic' & !ID_Job %in% muts.Germline, 'Somatic', germlineStatus))
 
@@ -157,27 +158,24 @@ filteredMuts <- unfilteredMuts %>%
         withinPanel,
         # Filter on DP.
         `[29]consensus5DP` >= 100,
-        # Filter on min. VAF.
+        # Filter on min. / max. VAF.
         !is.na(`[28]consensus5AF_Job`),
-        (`[28]consensus5AF_Job` >= 0.1 | (`[28]consensus5AF_Job` >= 0.05 & consensus5AltDepth >= 10)),
-        # Filter on max. VAF.
-        (`[28]consensus5AF_Job` <= 0.95 & !is.na(`[28]consensus5AF_Job`)),
+        `[28]consensus5AF_Job` >= 0.1,
+        `[28]consensus5AF_Job` <= 0.9,
         # Filter on coding.
         `[18]ann_hgvs_p` != '.',
         # Filter germline variants.
         germlineStatus == 'Somatic',
-        # Remove gnomad non-cancer variants.
-        `[11]non_cancer_AF` <= 0.025,
         # Remove COSMIC SNPs.
         !cosmicSNP,
         # Remove repeat-like mis-alignments.
-        !grepl('conservative_inframe_insertion', `[15]ann_annotation`)
+        !grepl('conservative_inframe_insertion', `[15]ann_annotation`) & (!grepl('COS', `[10]CPCTLABEL`) | !grepl('COS', `[3]ID`)),
+        !grepl('conservative_inframe_deletion', `[15]ann_annotation`) & (!grepl('COS', `[10]CPCTLABEL`) | !grepl('COS', `[3]ID`)),
     ) %>%
     # Filter on incidence within CABA-V7 samples.
     dplyr::group_by(ID_Job) %>%
     dplyr::mutate(totalCaba = dplyr::n_distinct(`L-code`)) %>%
-    dplyr::ungroup() %>%
-    dplyr::filter(totalCaba <= 30)
+    dplyr::ungroup()
 
 
 # Output mutations --------------------------------------------------------

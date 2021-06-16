@@ -32,7 +32,9 @@ dataMuts <- dataMuts %>% dplyr::mutate(
     SYMBOL = ann_gene_name,
     mutType = gsub('\\|.*', '', `ann_annotation`),
     mutType = gsub('&.*', '', mutType),
-    mutType = ifelse(grepl('splice', mutType), 'Splicing variant', gsub('_', ' ', Hmisc::capitalize(mutType))))
+    mutType = ifelse(grepl('splice', mutType), 'Splicing variant', gsub('_', ' ', Hmisc::capitalize(mutType))),
+    mutType = ifelse(grepl('Disruptive inframe', mutType), 'Disruptive inframe insertion/deletion', mutType)
+    )
 
 
 ## Combine multiple mutations per sample. ----
@@ -163,7 +165,7 @@ tracks.oncoplot$frequency <- dataOncoplot %>%
     dplyr::distinct() %>%
     ggplot2::ggplot(aes(x = SYMBOL, fill = `AR-V7 (Baseline)`, y = totalWithMut)) +
     ggplot2::geom_bar(stat = 'identity', lwd = .33, color = 'black', width = .7) +
-    ggplot2::scale_y_continuous(limits = c(0, 83), breaks = c(0, 20, 40, 60, 80), expand = c(0,0)) +
+    ggplot2::scale_y_continuous(limits = c(0, 51), breaks = c(0, 10, 20, 30, 40, 50), expand = c(0,0)) +
     ggplot2::labs(x = NULL, y = '\\# Mutant samples') +
     ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     ggplot2::coord_flip() +
@@ -176,7 +178,7 @@ tracks.oncoplot$TMB <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = totalMuts)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#F7EAC6', lwd = .33, width = .6) +
     ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, 5, 10, 15), limits = c(0, 16.1)) +
-    ggplot2::labs(y = 'Nr. of<br>coding mutation(s)') +
+    ggplot2::labs(y = 'Nr. of coding<br> mutation(s)') +
     themeTrack_Job
 
 ## Max. VAF ----
@@ -186,7 +188,7 @@ tracks.oncoplot$maxVAF <- dataOncoplot %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = maxVAF)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#95C7D9', lwd = .33, width = .6) +
     ggplot2::scale_y_continuous(expand = c(0,0), breaks = c(0, .2, .4, .6, .8, 1), limits = c(0, 1.01)) +
-    ggplot2::labs(y = 'Max. VAF of<br> coding mutation(s)') +
+    ggplot2::labs(y = 'Max. VAF of<br>coding mutation(s)') +
     themeTrack_Job
 
 ## CTC Count ----
@@ -195,8 +197,8 @@ tracks.oncoplot$countCTC <- dataOncoplot %>%
     dplyr::distinct(`L-code`, `CTC Count (Baseline – 7.5mL)`) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = `CTC Count (Baseline – 7.5mL)`)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#E6CAE4', lwd = .33, width = .6) +
-    ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), breaks = c(0, 5, 10, 25, 50, 100, 500, 1000, 2500, 5000), limits = c(0, 5200)) +
-    ggplot2::labs(y = 'CTC Count<br>(Baseline – 7.5mL; log<sub>10</sub>)') +
+    ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), breaks = c(0, 3, 10, 100, 1000, 5000), limits = c(0, 5200)) +
+    ggplot2::labs(y = 'CTC Count<br>(Baseline; log<sub>10</sub>)') +
     themeTrack_Job
 
 ## cfDNA yield ---
@@ -205,7 +207,7 @@ tracks.oncoplot$cfDNA <- dataOncoplot %>%
     dplyr::distinct(`L-code`, `cfDNA yield (ng)`) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = `cfDNA yield (ng)`)) +
     ggplot2::geom_bar(stat = 'identity', color = 'black', fill = '#F75050', lwd = .33, width = .6) +
-    ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), breaks = c(0, 5, 10, 25, 50, 100, 500, 1000, 2500, 5000), limits = c(0, 1001)) +
+    ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), breaks = c(0, 10, 100, 1000), limits = c(0, 1001)) +
     ggplot2::labs(y = 'cfDNA yield (ng)<br>(Baseline; log<sub>10</sub>)') +
     themeTrack_Job
 
@@ -215,7 +217,7 @@ tracks.oncoplot$oncoplot <- dataOncoplot %>% ggplot(aes(x = `L-code`, y = SYMBOL
     ggplot2::geom_tile(lwd = .2, width = .8, height = .8, color = 'grey95', na.rm = T) +
     # Colors of mutations.
     ggplot2::scale_fill_manual(values = colorMuts, drop = T) +
-    ggplot2::labs(x = 'Samples (CABA-V7) processed with target-panel (QIASeq)<br>(cfDNA; <i>n</i> = 131)', y = 'Genes') +
+    ggplot2::labs(x = 'Samples (CABA-V7) processed with targeted panel (QIAseq)<br>(cfDNA; <i>n</i> = 131)', y = 'Genes with coding mutation(s)') +
     # Legend settings.
     ggplot2::guides( fill = guide_legend(title = 'Mutational Categories', title.position = 'top', title.hjust = 0.5, ncol = 2, keywidth = 0.5, keyheight = 0.5)) +
     theme_Job +
@@ -229,7 +231,8 @@ tracks.oncoplot$oncoplot <- dataOncoplot %>% ggplot(aes(x = `L-code`, y = SYMBOL
 
 ## Genome-wide Z-score ----
 tracks.oncoplot$genomeWideZT1 <- dataOncoplot %>%
-    dplyr::distinct(`L-code`, `Genome-wide status (Baseline)` ) %>%
+    dplyr::distinct(`L-code`, `Genome-wide status (Baseline)`) %>%
+    dplyr::mutate(`Genome-wide status (Baseline)` = gsub('Genome-wide Z-score', 'Aneuploidy score', `Genome-wide status (Baseline)`)) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'Aneuploidy status (Baseline)', fill = `Genome-wide status (Baseline)`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
@@ -238,6 +241,7 @@ tracks.oncoplot$genomeWideZT1 <- dataOncoplot %>%
 
 tracks.oncoplot$genomeWideZT2 <- dataOncoplot %>%
     dplyr::distinct(`L-code`, `Genome-wide status (T2)`) %>%
+    dplyr::mutate(`Genome-wide status (T2)` = gsub('Genome-wide Z-score', 'Aneuploidy score', `Genome-wide status (T2)`)) %>%
     ggplot2::ggplot(., aes(x = `L-code`, y = 'Aneuploidy status (Baseline - T2)', fill = `Genome-wide status (T2)`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +

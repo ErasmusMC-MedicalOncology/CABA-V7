@@ -1,5 +1,5 @@
 # Author:                      Job van Riet
-# Date:                        02-06-2021
+# Date:                        16-06-2021
 # Function:                    Generate Survival Curves for the CABA-V7 study.
 
 
@@ -104,7 +104,8 @@ data.Survival <- data.Patient$clinicalData %>%
     dplyr::ungroup() %>%
     dplyr::mutate(
         `Inclusion (Treated with Caba)` = ifelse(is.na(`Inclusion (Treated with Caba)`), 'No', `Inclusion (Treated with Caba)`),
-        ctcCategory = ifelse(`CTC Count (Baseline – 7.5mL)` >= 3, 'CTC Count (Baseline) ≥3', 'CTC Count (Baseline) <3'),
+        ctcCategoryOn3 = ifelse(`CTC Count (Baseline – 7.5mL)` >= 3, 'CTC Count (Baseline) ≥3', 'CTC Count (Baseline) <3'),
+        ctcCategoryOn5 = ifelse(`CTC Count (Baseline – 7.5mL)` >= 5, 'CTC Count (Baseline) ≥5', 'CTC Count (Baseline) <5'),
         ARV7.PosvsOther = ifelse(`AR-V7 (Baseline)` %in% c('Neg.', 'Und.'), 'Neg. / Und.', `AR-V7 (Baseline)`),
         WHO.Pooled = ifelse(`WHO/ECOG PS at registration` %in% c(1,2), '1 - 2', `WHO/ECOG PS at registration`)
     ) %>%
@@ -157,13 +158,20 @@ plotFits$fit.BetweenConversion <- plotSurvival(fit.BetweenConversion, ylim = 21,
 
 ## Survival - CTC (All included; n = 133) ----
 
-fit.CTC <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategory, data = data.Survival)
-names(fit.CTC$strata) <-  c('CTC Count <3<br>(Baseline)', 'CTC Count ≥3<br>(Baseline)')
+fit.CTC3 <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn3, data = data.Survival)
+names(fit.CTC3$strata) <-  c('CTC Count <3<br>(Baseline)', 'CTC Count ≥3<br>(Baseline)')
 
 # Calculate HR.
-fit.CTC.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategory, data = data.Survival)
-plotFits$fit.CTC <- plotSurvival(fit.CTC, ylim = 45, data = data.Survival, hr = fit.CTC.hr, palette = c('#f23005', '#ffbe73'))
+fit.CTC3.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn3, data = data.Survival)
+plotFits$fit.CTC3 <- plotSurvival(fit.CTC3, ylim = 45, data = data.Survival, hr = fit.CTC3.hr, palette = c('#f23005', '#ffbe73'))
 
+
+fit.CTC5 <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn5, data = data.Survival)
+names(fit.CTC3$strata) <-  c('CTC Count <5<br>(Baseline)', 'CTC Count ≥5<br>(Baseline)')
+
+# Calculate HR.
+fit.CTC5.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn5, data = data.Survival)
+plotFits$fit.CTC5 <- plotSurvival(fit.CTC5, ylim = 45, data = data.Survival, hr = fit.CTC5.hr, palette = c('#f23005', '#ffbe73'))
 
 ## Survival - Genome-wide Z (All included; n = 127) ----
 
@@ -197,14 +205,14 @@ data.AIC <- data.Survival %>%
         Max..VAF,
         Total.Gleason,
         Age.at.registration,
-        Nr..of.Coding.Mutations,
+        Nr..of.coding.mutations,
         Genome.wide.status..Baseline.,
-        ctcCategory,
+        ctcCategoryOn3,
         WHO.Pooled
     ) %>%
     dplyr::filter(!is.na(Survival), Genome.wide.status..Baseline. != '.', !is.na(Max..VAF))
 
-fit.AIC <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Max..VAF + Total.Gleason + Age.at.registration + Nr..of.Coding.Mutations + Genome.wide.status..Baseline. + ctcCategory + WHO.Pooled, data = data.AIC, ties = 'breslow')
+fit.AIC <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Max..VAF + Total.Gleason + Age.at.registration + Nr..of.coding.mutations + Genome.wide.status..Baseline. + ctcCategoryOn3 + WHO.Pooled, data = data.AIC, ties = 'breslow')
 
 # Determine relevant factors using backward selection.
 MASS::stepAIC(fit.AIC, direction = 'backward')
@@ -218,12 +226,12 @@ data.MultiCox <- data.Survival %>%
         Survival,
         ARV7.PosvsOther,
         Genome.wide.status..Baseline.,
-        ctcCategory,
+        ctcCategoryOn3,
         WHO.Pooled
     ) %>%
     dplyr::filter(!is.na(Survival), Genome.wide.status..Baseline. != '.')
 
-fit.MultiCox <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Genome.wide.status..Baseline. + ctcCategory + WHO.Pooled, data = data.MultiCox, ties = 'breslow')
+fit.MultiCox <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Genome.wide.status..Baseline. + ctcCategoryOn3 + WHO.Pooled, data = data.MultiCox, ties = 'breslow')
 plotFits$fit.MultiCox <- survminer::ggforest(fit.MultiCox, data = data.MultiCox, noDigits = 2)
 
 
