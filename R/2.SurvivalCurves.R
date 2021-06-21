@@ -25,7 +25,7 @@ plotSurvival <- function(fit, ylim, data, palette = 'jco', hr = NULL){
     x <- survminer::ggsurvplot(
         fit = fit,
         pval = F,
-        size = .8,
+        size = .825,
         break.time.by = 10,
         break.y.by = .2,
         palette = palette,
@@ -76,6 +76,10 @@ plotSurvival <- function(fit, ylim, data, palette = 'jco', hr = NULL){
         dplyr::arrange(-medianOS)
 
     x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = .75, label = paste0('Median OS (Desc.):\n', paste(medianOS$label, collapse = '\n')), size = 2.5)
+
+    # Remove legends.
+    x$plot <- x$plot + theme_Job + theme(legend.position = 'none')
+    x$table <- x$table + theme_Job + theme(legend.position = 'none')
 
     return(x)
 }
@@ -142,7 +146,16 @@ plotFits$AllInclusion <- plotSurvival(fit.AllInClusion, data = data.Survival, yl
 
 # Hazard Ratio of multiple groups.
 fit.AllInClusion.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.Survival)
-plotFits$hazardAll <- survminer::ggforest(fit.AllInClusion.hr, data = data.Survival, noDigits = 2)
+plotFits$AllInClusion.hr <- survminer::ggforest(fit.AllInClusion.hr, data = data.Survival, noDigits = 2)
+
+
+## Survival - AR-V7 (Dichotomized) (All included; n = 133) ----
+
+fit.ARV7.PosvsOther <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther, data = data.Survival)
+names(fit.ARV7.PosvsOther$strata) <-  c('AR-V7 Neg. / Und.', 'AR-V7 Pos.')
+
+fit.ARV7.PosvsOther.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther, data = data.Survival)
+plotFits$fit.ARV7.PosvsOther <- plotSurvival(fit.ARV7.PosvsOther, hr = fit.ARV7.PosvsOther.hr, data = data.Survival, ylim = 51, palette = c('#576999', '#FE6100'))
 
 
 ## Survival - Caba-treated (per AR-V7 conversion) ----
@@ -158,16 +171,8 @@ plotFits$fit.BetweenConversion <- plotSurvival(fit.BetweenConversion, ylim = 21,
 
 ## Survival - CTC (All included; n = 133) ----
 
-fit.CTC3 <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn3, data = data.Survival)
-names(fit.CTC3$strata) <-  c('CTC Count <3<br>(Baseline)', 'CTC Count ≥3<br>(Baseline)')
-
-# Calculate HR.
-fit.CTC3.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn3, data = data.Survival)
-plotFits$fit.CTC3 <- plotSurvival(fit.CTC3, ylim = 45, data = data.Survival, hr = fit.CTC3.hr, palette = c('#f23005', '#ffbe73'))
-
-
 fit.CTC5 <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn5, data = data.Survival)
-names(fit.CTC3$strata) <-  c('CTC Count <5<br>(Baseline)', 'CTC Count ≥5<br>(Baseline)')
+names(fit.CTC5$strata) <-  c('CTC count <5<br>(Baseline)', 'CTC count ≥5<br>(Baseline)')
 
 # Calculate HR.
 fit.CTC5.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ctcCategoryOn5, data = data.Survival)
@@ -186,7 +191,7 @@ plotFits$fit.GenomeWideZ <- plotSurvival(fit.GenomeWideZ, ylim = 45, data = data
 ## Survival - WHO (All included; n = 127) ----
 
 fit.WHO <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ WHO.Pooled, data = data.Survival)
-names(fit.WHO$strata) <-  c('WHO Status: 0', 'WHO Status: 1-2')
+names(fit.WHO$strata) <-  c('WHO status: 0', 'WHO status: 1-2')
 
 # Calculate HR.
 fit.WHO.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ WHO.Pooled, data = data.Survival)
@@ -207,12 +212,12 @@ data.AIC <- data.Survival %>%
         Age.at.registration,
         Nr..of.coding.mutations,
         Genome.wide.status..Baseline.,
-        ctcCategoryOn3,
+        ctcCategoryOn5,
         WHO.Pooled
     ) %>%
     dplyr::filter(!is.na(Survival), Genome.wide.status..Baseline. != '.', !is.na(Max..VAF))
 
-fit.AIC <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Max..VAF + Total.Gleason + Age.at.registration + Nr..of.coding.mutations + Genome.wide.status..Baseline. + ctcCategoryOn3 + WHO.Pooled, data = data.AIC, ties = 'breslow')
+fit.AIC <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Max..VAF + Total.Gleason + Age.at.registration + Nr..of.coding.mutations + Genome.wide.status..Baseline. + ctcCategoryOn5 + WHO.Pooled, data = data.AIC, ties = 'breslow')
 
 # Determine relevant factors using backward selection.
 MASS::stepAIC(fit.AIC, direction = 'backward')
@@ -226,43 +231,77 @@ data.MultiCox <- data.Survival %>%
         Survival,
         ARV7.PosvsOther,
         Genome.wide.status..Baseline.,
-        ctcCategoryOn3,
+        ctcCategoryOn5,
         WHO.Pooled
     ) %>%
     dplyr::filter(!is.na(Survival), Genome.wide.status..Baseline. != '.')
 
-fit.MultiCox <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Genome.wide.status..Baseline. + ctcCategoryOn3 + WHO.Pooled, data = data.MultiCox, ties = 'breslow')
+fit.MultiCox <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ ARV7.PosvsOther + Genome.wide.status..Baseline. + ctcCategoryOn5 + WHO.Pooled, data = data.MultiCox, ties = 'breslow')
 plotFits$fit.MultiCox <- survminer::ggforest(fit.MultiCox, data = data.MultiCox, noDigits = 2)
 
 
-# Generate Main Figure ----------------------------------------------------
+# Generate Multi-Cox Figure -----------------------------------------------
 
 layout <- "
-ACD
-BCE
-"
+ABD
+ACE
+AFH
+#GI"
 
-plotFits$AllInclusion$plot +
-    plotFits$AllInclusion$table +
-    plotFits$fit.MultiCox +
-    plotFits$fit.BetweenConversion$plot +
+plotFits$fit.MultiCox +
+    plotFits$fit.ARV7.PosvsOther$plot +
+    plotFits$fit.ARV7.PosvsOther$table +
+    plotFits$fit.GenomeWideZ$plot +
+    plotFits$fit.GenomeWideZ$table +
+    plotFits$fit.CTC$plot +
+    plotFits$fit.CTC$table +
+    plotFits$fit.WHO$plot +
+    plotFits$fit.WHO$table +
+    patchwork::plot_layout(design = layout, heights = c(1, .25, 1, .25), widths = c(1.5, 1, 1), guides = 'auto') +
+    patchwork::plot_annotation(tag_levels = 'a') & ggplot2::theme(plot.tag = element_text(size = 11, family = 'Helvetica'))
+
+
+# Kaplan - Converters -----------------------------------------------------
+
+
+plotFits$fit.BetweenConversion$plot +
     plotFits$fit.BetweenConversion$table +
-    patchwork::plot_layout(design = layout, heights = c(1, .25), widths = c(1, 1.25, 1), ncol = 3, guides = 'auto') +
+    patchwork::plot_layout(nrow = 2, heights = c(1, .25), guides = 'auto') +
     patchwork::plot_annotation(tag_levels = 'a') & ggplot2::theme(plot.tag = element_text(size = 11, family = 'Helvetica'))
 
 
 # Generate Suppl. Fig. ----------------------------------------------------
 
+# Generate groups.
+data.Survival <- data.Survival %>%
+    dplyr::mutate(
+        group = ifelse(CTC.Count..Baseline...7.5mL. < 5 & Genome.wide.status..Baseline. == 'Genome-wide Z-score <5', 'CTC count < 5 & Aneuploidy score < 5', 'Other'),
+        group = ifelse(CTC.Count..Baseline...7.5mL. < 5 & Genome.wide.status..Baseline. != 'Genome-wide Z-score <5', 'CTC count < 5 & Aneuploidy score ≥ 5', group),
+        group = ifelse(CTC.Count..Baseline...7.5mL. >= 5 & Genome.wide.status..Baseline. == 'Genome-wide Z-score <5', 'CTC count ≥ 5 & Aneuploidy score < 5', group),
+        group = ifelse(CTC.Count..Baseline...7.5mL. >= 5 & Genome.wide.status..Baseline. != 'Genome-wide Z-score <5', 'CTC count ≥ 5 & Aneuploidy score ≥ 5', group)
+    )
 
-layout <- "
-ABC
-DEF"
 
-plotFits$fit.CTC$plot +
-    plotFits$fit.GenomeWideZ$plot +
-    plotFits$fit.WHO$plot +
-    plotFits$fit.CTC$table +
-    plotFits$fit.GenomeWideZ$table +
-    plotFits$fit.WHO$table +
-    patchwork::plot_layout(design = layout, heights = c(1, .25), guides = 'auto') +
+fit.Groups <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ group, data = data.Survival)
+names(fit.Groups$strata) <-  gsub('group=', '', names(fit.Groups$strata))
+
+plotFits$groups <- plotSurvival(fit.Groups, data = data.Survival, ylim = 51)
+
+# Hazard Ratio of multiple groups.
+fit.groups.hr <- survival::coxph(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ group, data = data.Survival)
+plotFits$fit.groups.hr <- survminer::ggforest(fit.groups.hr, data = data.Survival, noDigits = 2)
+
+# Combine plots.
+layout <- '
+AD
+BE
+CF'
+
+plotFits$AllInclusion$plot +
+    plotFits$AllInclusion$table +
+    plotFits$AllInClusion.hr +
+    plotFits$groups$plot +
+    plotFits$groups$table +
+    plotFits$fit.groups.hr +
+    patchwork::plot_layout(design = layout, heights = c(1, .25, 1.5), guides = 'auto') +
     patchwork::plot_annotation(tag_levels = 'a') & ggplot2::theme(plot.tag = element_text(size = 11, family = 'Helvetica'))
