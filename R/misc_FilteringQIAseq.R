@@ -2,10 +2,6 @@
 # Date:                        14-06-2021
 # Function:                    Import unfiltered QIAseq mutations and perform (germline) filtering.
 
-# VCF files were first normalized / left-aligned using:
-# for VCF in *.ann.vcf.gz;
-# do echo "bcftools norm -f Homo_sapiens.GRCh38.dna.primary_assembly.fa -m -any -O v -o ${VCF/.gz/_normed.gz} ${VCF};"
-# done
 
 # Import libraries --------------------------------------------------------
 
@@ -160,8 +156,8 @@ filteredMuts <- unfilteredMuts %>%
         `[29]consensus5DP` >= 100,
         # Filter on min. / max. VAF.
         !is.na(`[28]consensus5AF_Job`),
-        `[28]consensus5AF_Job` >= 0.1,
-        `[28]consensus5AF_Job` <= 0.9,
+        (`[28]consensus5AF_Job` >= 0.1 | (`[28]consensus5AF_Job` >= 0.05) & consensus5AltDepth >= 25),
+        `[28]consensus5AF_Job` <= 0.95,
         # Filter on coding.
         `[18]ann_hgvs_p` != '.',
         # Filter germline variants.

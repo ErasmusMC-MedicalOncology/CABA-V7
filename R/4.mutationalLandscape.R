@@ -24,7 +24,6 @@ data.Patient$clinicalData <- readxl::read_excel('Misc./Suppl. Table 1 - Overview
 # (Filtered) QIAseq mutations.
 dataMuts <- readxl::read_excel('Misc./Suppl. Table 1 - Overview of Data.xlsx', trim_ws = T, sheet = 'QIASeq - Filtered')
 
-
 # Clean-up data -----------------------------------------------------------
 
 ## Clean-up mutational consequences ----
@@ -70,7 +69,7 @@ dataOncoplot <- dataOncoplot %>%
         dataMuts %>%
             dplyr::group_by(`L-code`) %>%
             dplyr::summarise(
-                totalMuts = dplyr::n_distinct(ID_Job),
+                totalMuts = dplyr::n(),
                 maxVAF = base::max(consensus5AF_Job, na.rm = T)
             )
     )
@@ -165,8 +164,9 @@ tracks.oncoplot$frequency <- dataOncoplot %>%
     dplyr::distinct() %>%
     ggplot2::ggplot(aes(x = SYMBOL, fill = `AR-V7 (Baseline)`, y = totalWithMut)) +
     ggplot2::geom_bar(stat = 'identity', lwd = .33, color = 'black', width = .7) +
-    ggplot2::scale_y_continuous(limits = c(0, 51), breaks = c(0, 10, 20, 30, 40, 50), expand = c(0,0)) +
+    ggplot2::scale_y_continuous(limits = c(0, 61), breaks = c(0, 10, 20, 30, 40, 50, 60), expand = c(0,0)) +
     ggplot2::labs(x = NULL, y = '\\# Mutant samples') +
+    ggplot2::geom_text(data = . %>% dplyr::distinct(SYMBOL, totalMut) %>% dplyr::mutate(label = sprintf('(%s)', totalMut)), aes(label = label, y = totalMut, fill = NA), nudge_y = 1.5, size = 2) +
     ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     ggplot2::coord_flip() +
     theme_Job + theme(axis.text.y = ggplot2::element_blank())
@@ -242,7 +242,7 @@ tracks.oncoplot$genomeWideZT1 <- dataOncoplot %>%
 tracks.oncoplot$genomeWideZT2 <- dataOncoplot %>%
     dplyr::distinct(`L-code`, `Genome-wide status (T2)`) %>%
     dplyr::mutate(`Genome-wide status (T2)` = gsub('Genome-wide Z-score', 'Aneuploidy score', `Genome-wide status (T2)`)) %>%
-    ggplot2::ggplot(., aes(x = `L-code`, y = 'Aneuploidy status (Baseline - T2)', fill = `Genome-wide status (T2)`)) +
+    ggplot2::ggplot(., aes(x = `L-code`, y = 'Aneuploidy status (T2)', fill = `Genome-wide status (T2)`)) +
     ggplot2::geom_tile(width = .8, colour = 'grey50', lwd = .25, na.rm = T) +
     ggplot2::labs(y = NULL, x = NULL) +
     ggplot2::scale_fill_manual(values = c('Aneuploidy score <5' = 'black', 'Aneuploidy score ≥5' = 'grey70'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
@@ -325,5 +325,5 @@ tracks.oncoplot$TMB +
     tracks.oncoplot$responsePSA +
     tracks.oncoplot$responseCTC +
     tracks.oncoplot$responseCTCDecline +
-    patchwork::plot_layout(design = layout, heights = c(.25, .25, .25, .25, 2, rep(.075, 7)), widths = c(1, .125), guides = 'collect') +
+    patchwork::plot_layout(design = layout, heights = c(.25, .25, .25, .25, 2, rep(.05, 7)), widths = c(1, .125), guides = 'collect') +
     patchwork::plot_annotation(tag_levels = 'a')
