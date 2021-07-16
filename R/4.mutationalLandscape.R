@@ -38,7 +38,7 @@ dataMuts <- dataMuts %>% dplyr::mutate(
 
 ## Combine multiple mutations per sample. ----
 dataOncoplot <- dataMuts %>%
-    dplyr::group_by(`L-code`, SYMBOL, mutType) %>%
+    dplyr::group_by(`L-code`, SYMBOL) %>%
     dplyr::summarise(
         mutType = ifelse(n() > 1, 'Multiple mutations', mutType),
         isMutant = T
@@ -82,6 +82,7 @@ memoData <- R2CPCT::memoSort(memoData)
 
 dataOncoplot$SYMBOL <- factor(dataOncoplot$SYMBOL, levels = rev(rownames(memoData)))
 dataOncoplot$`L-code` <- factor(dataOncoplot$`L-code`, levels = colnames(memoData))
+
 
 # Calc. Mut. Excl. Genes. -------------------------------------------------
 
@@ -164,9 +165,9 @@ tracks.oncoplot$frequency <- dataOncoplot %>%
     dplyr::distinct() %>%
     ggplot2::ggplot(aes(x = SYMBOL, fill = `AR-V7 (Baseline)`, y = totalWithMut)) +
     ggplot2::geom_bar(stat = 'identity', lwd = .33, color = 'black', width = .7) +
-    ggplot2::scale_y_continuous(limits = c(0, 61), breaks = c(0, 10, 20, 30, 40, 50, 60), expand = c(0,0)) +
+    ggplot2::scale_y_continuous(limits = c(0, 55), breaks = c(0, 10, 20, 30, 40, 50), expand = c(0,0)) +
     ggplot2::labs(x = NULL, y = '\\# Mutant samples') +
-    ggplot2::geom_text(data = . %>% dplyr::distinct(SYMBOL, totalMut) %>% dplyr::mutate(label = sprintf('(%s)', totalMut)), aes(label = label, y = totalMut, fill = NA), nudge_y = 1.5, size = 2) +
+    ggplot2::geom_text(data = . %>% dplyr::distinct(SYMBOL, totalMut) %>% dplyr::mutate(label = sprintf('(%s)', totalMut)), aes(label = label, y = totalMut, fill = NULL), nudge_y = 1.5, size = 2) +
     ggplot2::scale_fill_manual(values = c('Pos.' = '#FE6100', 'Neg.' = '#648FFF', 'Und.' = '#4D4D4D'), guide = guide_legend(title = NULL, title.position = 'top', title.hjust = 0.5, nrow = 1, keywidth = 0.5, keyheight = 0.5)) +
     ggplot2::coord_flip() +
     theme_Job + theme(axis.text.y = ggplot2::element_blank())
