@@ -45,21 +45,21 @@ dataFastSeq.Combined <- dataFastSeq.T1 %>%
         value.deltaT2vsT1 = value.T2 - value.T1
     ) %>%
     dplyr::inner_join(overviewPatients %>% dplyr::select(`Subject Number`, `AR-V7 (Baseline)`, `AR-V7 Conversion`, `Genome-Wide Z Score (Baseline)`, `Genome-Wide Z Score (T2)`), by = 'Subject Number') %>%
-
+    
     # Remove samples with no first and second AR-V7 determination.
     dplyr::filter(!is.na(`AR-V7 Conversion`), !is.na(`AR-V7 (Baseline)`)) %>%
-
+    
     # Add nr. of patients per conversion group.
     dplyr::group_by(`AR-V7 Conversion`) %>%
     dplyr::mutate(`AR-V7 Conversion` = sprintf('%s (<i>n</i> = %s)', ifelse(`AR-V7 Conversion` == 'Neg.', 'AR-V7<sup>Conv.</sup>', ifelse(`AR-V7 Conversion` == 'Pos.', 'AR-V7<sup>Pos.</sup>', 'Und.')), dplyr::n_distinct(`Subject Number`))) %>%
     dplyr::ungroup() %>%
-
+    
     # Sort on Pos and then Conv patients.
     dplyr::mutate(`AR-V7 Conversion` = factor(`AR-V7 Conversion`, levels = c('AR-V7<sup>Pos.</sup> (<i>n</i> = 8)', 'AR-V7<sup>Conv.</sup> (<i>n</i> = 8)'))) %>%
-
+    
     # Remove acrocentric chromosomes which we cannot measure
     dplyr::filter(!is.na(value.deltaT2vsT1)) %>%
-
+    
     # Fix numerics.
     dplyr::mutate(`Genome-Wide Z Score (Baseline)` = as.numeric(`Genome-Wide Z Score (Baseline)`))
 
@@ -178,7 +178,7 @@ dataFastSeq.Combined %>%
         deltaZ = abs(value.T2 - value.T1),
         `Subject Number` = factor(`Subject Number`, levels = dataFastSeq.Combined %>% dplyr::distinct(`Subject Number`, `AR-V7 Conversion`) %>% dplyr::arrange(`AR-V7 Conversion`) %>% dplyr::pull(`Subject Number`))
     ) %>%
-
+    
     ggplot2::ggplot(., aes(x = `Chromosomal arm`, xend = `Chromosomal arm`, group = `Subject Number`)) +
     # Points and arrows.
     ggplot2::geom_point(aes(y = `value.T2`), fill = '#3E3EF7', size = 1.25, shape = 23) +
@@ -232,7 +232,7 @@ plots.FastSeq$ZT1.Pos_Convdata <- dataFastSeq.Combined %>%
     dplyr::group_by(`AR-V7 Conversion`) %>%
     dplyr::mutate(median = round(median(`Genome-Wide Z Score (Baseline)`), 1)) %>%
     dplyr::ungroup() %>%
-
+    
     ggplot2::ggplot(., aes(x = `AR-V7 Conversion`, y = `Genome-Wide Z Score (Baseline)`, fill = `AR-V7 Conversion`, label = median)) +
     ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), limits = c(-1, 130), breaks = c(-1, 0:5, 10, 20, 50, 100, 125)) +
     gghalves::geom_half_boxplot(outlier.shape = NA, alpha = .5, color = 'black') +
@@ -250,7 +250,7 @@ plots.FastSeq$ZT2.Pos_Conv <- dataFastSeq.Combined %>%
     dplyr::group_by(`AR-V7 Conversion`) %>%
     dplyr::mutate(median = round(median(`Genome-Wide Z Score (T2)`), 1)) %>%
     dplyr::ungroup() %>%
-
+    
     ggplot2::ggplot(., aes(x = `AR-V7 Conversion`, y = `Genome-Wide Z Score (T2)`, fill = `AR-V7 Conversion`, label = median)) +
     ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), limits = c(-1, 130), breaks = c(-1, 0:5, 10, 20, 50, 100, 125)) +
     gghalves::geom_half_boxplot(outlier.shape = NA, alpha = .5, color = 'black') +
@@ -269,7 +269,7 @@ plots.FastSeq$BothT.Pos_Conv <- dataFastSeq.Combined %>%
     dplyr::group_by(variable, `AR-V7 Conversion`) %>%
     dplyr::mutate(median = round(median(value), 1)) %>%
     dplyr::ungroup() %>%
-
+    
     ggplot2::ggplot(., aes(x = variable, y = value, fill = `AR-V7 Conversion`, label = median)) +
     ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), limits = c(-1, 130), breaks = c(-1, 0:5, 10, 20, 50, 100, 125)) +
     gghalves::geom_half_boxplot(outlier.shape = NA, center = T, side = 'l', alpha = .5, color = 'black') +
@@ -318,7 +318,7 @@ plots.CTCs$convCTC <- dataConv.CTC %>%
     gghalves::geom_half_boxplot(side = 'l', alpha = .5, outlier.shape = NA, notch = F, show.legend = F) +
     gghalves::geom_half_point_panel(side = 'r', size = 1.25, color = 'black') +
     ggplot2::stat_summary(fun = median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-4, angle = 90, hjust = .5) +
-
+    
     ggplot2::scale_fill_manual(values = c('AR-V7<sup>Conv.</sup><br>(<i>n</i> = 10)' = '#00A94D', 'AR-V7<sup>Pos.</sup><br>(<i>n</i> = 9)' = '#FE6100'), guide = F) +
     ggplot2::scale_color_manual(values = c('AR-V7<sup>Conv.</sup><br>(<i>n</i> = 10)' = '#00A94D', 'AR-V7<sup>Pos.</sup><br>(<i>n</i> = 9)' = '#FE6100'), guide = F) +
     ggplot2::labs(x = 'AR-V7 determination<br>(post-cabazitaxel; T2)', y = 'CTC Count (Baseline)') +
@@ -352,7 +352,7 @@ plots.CTCs$convCTC.T2 <- dataConv.CTC.T2 %>%
     gghalves::geom_half_boxplot(side = 'l', alpha = .5, outlier.shape = NA, notch = F, show.legend = F) +
     gghalves::geom_half_point_panel(side = 'r', size = 1.25, color = 'black') +
     ggplot2::stat_summary(fun=median, colour='black', geom='text', size = 3, show.legend = FALSE, vjust=-4, angle = 90, hjust = .5) +
-
+    
     ggplot2::scale_fill_manual(values = c('AR-V7<sup>Conv.</sup><br>(<i>n</i> = 9)' = '#00A94D', 'AR-V7<sup>Pos.</sup><br>(<i>n</i> = 9)' = '#FE6100'), guide = F) +
     ggplot2::scale_color_manual(values = c('AR-V7<sup>Conv.</sup><br>(<i>n</i> = 9)' = '#00A94D', 'AR-V7<sup>Pos.</sup><br>(<i>n</i> = 9)' = '#FE6100'), guide = F) +
     ggplot2::labs(x = 'AR-V7 determination<br>(post-cabazitaxel; T2)', y = 'CTC Count (T2)') +
@@ -385,7 +385,7 @@ dataConv.CTCBetweenT1AndT2 %>%
     dplyr::group_by(variable, g) %>%
     dplyr::mutate(median = round(median(value), 1)) %>%
     dplyr::ungroup() %>%
-
+    
     ggplot2::ggplot(., aes(x = variable, y = value, fill = g, label = median)) +
     ggplot2::scale_y_continuous(trans = scales::pseudo_log_trans(), expand = c(0,0), limits = c(-.2, 2500), breaks = c(0:5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000)) +
     gghalves::geom_half_boxplot(outlier.shape = NA, center = T, side = 'l', alpha = .5, color = 'black') +

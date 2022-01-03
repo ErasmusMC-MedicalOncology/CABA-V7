@@ -60,11 +60,8 @@ readVCF.Biomics <- function(x){
 
 # Import data -------------------------------------------------------------
 
-biomicsIDs <- readr::read_tsv('Misc./biomicsIDs.txt')
-
 # Import germline and somatic variants.
 vcfFiles <- list.files('/mnt/data2/hartwig/DR71/Misc/CABAV7', pattern = 'ann.tsv.gz', full.names = T)
-vcfFiles <- vcfFiles[grepl(paste(biomicsIDs$biomicsID, collapse = '|'), vcfFiles)]
 
 # Import unfiltered QIAseq mutations.
 unfilteredMuts <- dplyr::bind_rows(pbapply::pblapply(vcfFiles, readVCF.Biomics, cl = 20))

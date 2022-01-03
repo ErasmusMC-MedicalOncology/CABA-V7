@@ -33,7 +33,7 @@ dataMuts <- dataMuts %>% dplyr::mutate(
     mutType = gsub('&.*', '', mutType),
     mutType = ifelse(grepl('splice', mutType), 'Splicing variant', gsub('_', ' ', Hmisc::capitalize(mutType))),
     mutType = ifelse(grepl('Disruptive inframe', mutType), 'Disruptive inframe insertion/deletion', mutType)
-    )
+)
 
 
 ## Combine multiple mutations per sample. ----
@@ -101,31 +101,31 @@ dataFisher <- dataFisher %>% dplyr::filter(SYMBOL %in% dataFisher[(dataFisher$to
 
 # Perform Fisher's Exact Test
 dataFisher.Results <- do.call(rbind, lapply(unique(dataFisher$SYMBOL), function(gene){
-
+    
     geneData <- dataFisher %>%
         dplyr::filter(SYMBOL == gene) %>%
         dplyr::summarise(
             SYMBOL = unique(SYMBOL),
-
+            
             Pos.withMut = totalMut[`AR-V7 (Baseline)` == 'Pos.'],
             Pos.withoutMut = totalNoMut[`AR-V7 (Baseline)` == 'Pos.'],
-
+            
             Neg.withMut = sum(totalMut[`AR-V7 (Baseline)` == 'Neg.']),
             Neg.withoutMut = sum(totalNoMut[`AR-V7 (Baseline)` == 'Neg.'])
-
+            
         )
-
+    
     test <- data.frame(
         row.names = c('Pos.', 'Neg.'),
         mut = c(geneData$Pos.withMut, geneData$Neg.withMut),
         noMut = c(geneData$Pos.withoutMut, geneData$Neg.withoutMut)
     )
-
+    
     geneData$Fisher.p <- fisher.test(test, hybrid = F, alternative = 'two.sided', simulate.p.value = T)$p.value
     geneData$chi.p <- chisq.test(test, simulate.p.value = T)$p.value
-
+    
     return(geneData)
-
+    
 }))
 
 # Correct for multiple testing.
