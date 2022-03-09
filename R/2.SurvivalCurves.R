@@ -1,5 +1,5 @@
 # Author:                      Job van Riet
-# Date:                        16-06-2021
+# Date:                        09-03-2022
 # Function:                    Generate Survival Curves for the CABA-V7 study.
 
 
@@ -20,7 +20,7 @@ source('R/misc_themes.R')
 
 # Generate survival plots with p-values and median OS.
 plotSurvival <- function(fit, ylim, data, palette = 'jco', hr = NULL){
-    
+
     # Generate survival plot.
     x <- survminer::ggsurvplot(
         fit = fit,
@@ -51,20 +51,20 @@ plotSurvival <- function(fit, ylim, data, palette = 'jco', hr = NULL){
             legend.text = ggtext::element_markdown()
         )
     )
-    
+
     # Add the log-rank p-value.
     p.logrank <- survminer::surv_pvalue(fit = fit, method = 'log-rank', data = data, test.for.trend = F)
     x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = 1, label = paste0('log-rank: ', p.logrank$pval.txt), size = 2.5)
-    
+
     # Add HR (if two groups)
     if(!is.null(hr)){
-        
+
         HR.CI <- round(summary(hr)$conf.int, 2)
         HR.p <- round(summary(hr)$waldtest[[3]], 2)
         HR.CI <- sprintf('HR (.95%% CI): %s (%s - %s)', HR.CI[[1]], HR.CI[[3]], HR.CI[[4]])
         x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = .9, label = HR.CI, size = 2.5)
     }
-    
+
     # Add the median OS.
     medianOS <- x$data.survplot %>%
         dplyr::group_by(strata) %>%
@@ -74,13 +74,13 @@ plotSurvival <- function(fit, ylim, data, palette = 'jco', hr = NULL){
         ) %>%
         dplyr::ungroup() %>%
         dplyr::arrange(-medianOS)
-    
+
     x$plot <- x$plot + ggplot2::annotate("text", x = max(x$data.survplot$time) * .75, y = .75, label = paste0('Median OS (Desc.):\n', paste(medianOS$label, collapse = '\n')), size = 2.5)
-    
+
     # Remove legends.
     x$plot <- x$plot + theme_Job + theme(legend.position = 'none')
     x$table <- x$table + theme_Job + theme(legend.position = 'none')
-    
+
     return(x)
 }
 
@@ -113,7 +113,7 @@ data.Survival <- data.Patient$clinicalData %>%
         ARV7.PosvsOther = ifelse(`AR-V7 (Baseline)` %in% c('Neg.', 'Und.'), 'Neg. / Und.', `AR-V7 (Baseline)`),
         WHO.Pooled = ifelse(`WHO/ECOG PS at registration` %in% c(1,2), '1 - 2', `WHO/ECOG PS at registration`)
     ) %>%
-    
+
     # Combine
     data.frame()
 
@@ -125,7 +125,7 @@ plotFits <- list()
 data.Survival %>%
     dplyr::filter(Inclusion..Treated.with.Caba. == 'Yes') %>%
     dplyr::mutate(
-        totalTrialTime = Date..End.of.cabazitaxel.treatment - Date..Start.of.cabazitaxel.treatment
+        totalTrialTime = Date..End.of.Post.Treatment - Date..Start.of.Post.Treatment
     ) %>%
     dplyr::summarise(
         median(daysFromPreScreeningToEnd, na.rm = T),
@@ -138,6 +138,8 @@ data.Survival %>%
 # Survival Analysis (Cox regression) --------------------------------------
 
 ## Survival - AR-V7 (All included; n = 133) ----
+
+data.Survival <- data.Survival %>% dplyr::filter(grepl('Cabazitaxel', Post.Treatment))
 
 fit.AllInClusion <- survminer::surv_fit(formula = survival::Surv(monthsFromPreScreeningToEnd, Survival) ~ AR.V7..Baseline., data = data.Survival)
 names(fit.AllInClusion$strata) <-  c('AR-V7 Neg.', 'AR-V7 Pos.', 'AR-V7 Und.')
